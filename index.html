@@ -401,9 +401,11 @@
     let normCache = [];
     let selectedIndex = null;
     const checkedSet = new Set();
+    const serverChecks = new Map();
     let displayKey = null;
     let subKey = null;
     let checkedKey = null;
+    let idKey = null;
 
     function normalize(s){
       return (s ?? "").toString().trim().toLowerCase().replace(/\s+/g, " ");
@@ -498,6 +500,7 @@
       displayKey = findHeaderKey(["full_name","name","full name","guest","guest_name"]) || searchCol.value || headers[0] || null;
       subKey = findHeaderKey(["email","phone","ticket_id","id"]);
       checkedKey = findHeaderKey(["checked_in_at","checked_in","checkin_at","check_in_at","checked in"]);
+      idKey = findHeaderKey(["ticket_id","id","email","phone"]);
     }
 
     function initCheckedSet(){
@@ -521,9 +524,30 @@
     }
 
     function isCheckedRow(row, index){
+      const id = getRowId(row, index);
+      if(id && serverChecks.has(id)) return true;
       if(checkedSet.has(index)) return true;
       if(!checkedKey) return false;
       return normalize(row[checkedKey]) !== "";
+    }
+
+    function getRowId(row, index){
+      if(idKey && row[idKey]) return String(row[idKey]).trim();
+      return `row_${index}`;
+    }
+
+    async function loadCheckins(){
+      serverChecks.clear();
+      try{
+        const res = await fetch("/api/checkins", { cache: "no-store" });
+        if(!res.ok) return;
+        const data = await res.json();
+        if(data && data.checkins){
+          for(const [id, ts] of Object.entries(data.checkins)){
+            if(id) serverChecks.set(id, ts);
+          }
+        }
+      }catch(_){}
     }
 
     function passesCheckFilter(row, index){
@@ -563,10 +587,13 @@
       checkInBtn.textContent = checked ? "Checked in" : "Check in";
 
       if(checked){
-        if(checkedKey && row[checkedKey]) rowNote.textContent = `Checked in at: ${row[checkedKey]}`;
+        const id = getRowId(row, selectedIndex);
+        const ts = id ? serverChecks.get(id) : null;
+        if(ts) rowNote.textContent = `Checked in at: ${ts}`;
+        else if(checkedKey && row[checkedKey]) rowNote.textContent = `Checked in at: ${row[checkedKey]}`;
         else rowNote.textContent = "Checked in (local only).";
       } else {
-        rowNote.textContent = checkedKey ? "Not checked in yet." : "No checked_in column; check-in is local only.";
+        rowNote.textContent = checkedKey ? "Not checked in yet." : "Not checked in yet.";
       }
     }
 
@@ -690,12 +717,34 @@ const tds = headers.map(h => {
 
     checkInBtn.addEventListener("click", ()=>{
       if(selectedIndex === null || !rows[selectedIndex]) return;
-      const now = new Date().toISOString();
-      checkedSet.add(selectedIndex);
-      if(checkedKey) rows[selectedIndex][checkedKey] = now;
-      searchNow();
-      setRowAction(rows[selectedIndex]);
-      updateCheckCounts();
+      (async ()=>{
+        const now = new Date().toISOString();
+        const row = rows[selectedIndex];
+        const id = getRowId(row, selectedIndex);
+
+        checkInBtn.disabled = true;
+        checkInBtn.textContent = "Checking in…";
+
+        try{
+          const res = await fetch("/api/checkin", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id, checkedInAt: now })
+          });
+          if(!res.ok) throw new Error("Check-in failed");
+          serverChecks.set(id, now);
+          checkedSet.add(selectedIndex);
+          if(checkedKey) rows[selectedIndex][checkedKey] = now;
+        }catch(_){
+          // keep local state so UI is usable even if API fails
+          checkedSet.add(selectedIndex);
+          if(checkedKey) rows[selectedIndex][checkedKey] = now;
+        }
+
+        searchNow();
+        setRowAction(rows[selectedIndex]);
+        updateCheckCounts();
+      })();
     });
 
     clearSelBtn.addEventListener("click", clearSelection);
@@ -761,6 +810,7 @@ const tds = headers.map(h => {
         rebuildNormCache();
         initHeaderKeys();
         initCheckedSet();
+        await loadCheckins();
         updateCheckCounts();
 
         setDataUI("ok", `Loaded ${rows.length} row(s).`);

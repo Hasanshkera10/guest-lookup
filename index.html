@@ -157,7 +157,14 @@
   overflow: hidden;            /* hide overflow */
   text-overflow: ellipsis;     /* show ... */
     }
+    tbody tr{ cursor:pointer; }
     tbody tr:hover{ background: rgba(255,255,255,.04); }
+    tbody tr.selected{
+      background: rgba(139,92,246,.18);
+      outline: 1px solid rgba(139,92,246,.35);
+      outline-offset: -1px;
+    }
+    tbody tr.checked td{ color:#BDE7D0; }
     .muted{ color:var(--muted); font-size:13px; }
     .kpi{
       display:grid;
@@ -211,6 +218,22 @@
     .row{ display:grid; grid-template-columns: 1fr auto; gap:10px; align-items:end; }
     @media (max-width: 520px){ .row{ grid-template-columns:1fr; } }
     .err{ color: #FFD7DE; font-size:13px; margin-top:10px; display:none; }
+    .rowAction{
+      margin-top:12px;
+      display:flex;
+      gap:12px;
+      align-items:center;
+      justify-content:space-between;
+      padding:12px;
+      border:1px solid var(--stroke);
+      border-radius:12px;
+      background:rgba(8,12,24,.6);
+    }
+    .rowAction.hidden{ display:none; }
+    .rowAction .rowTitle{ font-weight:700; }
+    .rowAction .rowSub{ font-size:12px; color:var(--muted); margin-top:2px; }
+    .rowAction .rowNote{ font-size:12px; color:#CFE0FF; margin-top:6px; }
+    .rowBtns{ display:flex; gap:8px; flex-wrap:wrap; }
   </style>
 </head>
 <body>
@@ -295,6 +318,17 @@
         </div>
         <div class="bd">
           <div id="results" class="muted">No results yet.</div>
+          <div id="rowAction" class="rowAction hidden">
+            <div>
+              <div class="rowTitle" id="rowTitle">—</div>
+              <div class="rowSub" id="rowSub">—</div>
+              <div class="rowNote" id="rowNote"></div>
+            </div>
+            <div class="rowBtns">
+              <button class="btn" id="checkInBtn" disabled>Check in</button>
+              <button class="btn secondary" id="clearSelBtn">Close</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -337,6 +371,12 @@
 
     const resultsEl = document.getElementById("results");
     const resultsMeta = document.getElementById("resultsMeta");
+    const rowAction = document.getElementById("rowAction");
+    const rowTitle = document.getElementById("rowTitle");
+    const rowSub = document.getElementById("rowSub");
+    const rowNote = document.getElementById("rowNote");
+    const checkInBtn = document.getElementById("checkInBtn");
+    const clearSelBtn = document.getElementById("clearSelBtn");
 
     const kpiRows = document.getElementById("kpiRows");
     const kpiCol = document.getElementById("kpiCol");
@@ -350,6 +390,11 @@
     let headers = [];
     let rows = [];
     let normCache = [];
+    let selectedIndex = null;
+    const checkedSet = new Set();
+    let displayKey = null;
+    let subKey = null;
+    let checkedKey = null;
 
     function normalize(s){
       return (s ?? "").toString().trim().toLowerCase().replace(/\s+/g, " ");
@@ -427,6 +472,73 @@
       const key = searchCol.value;
       normCache = rows.map(r => normalize(r[key]));
       kpiCol.textContent = key ? key : "—";
+      if(!displayKey || !headers.includes(displayKey)) displayKey = key || headers[0] || null;
+    }
+
+    function findHeaderKey(candidates){
+      const normHeaders = headers.map(h => normalize(h));
+      for(const c of candidates){
+        const idx = normHeaders.indexOf(normalize(c));
+        if(idx !== -1) return headers[idx];
+      }
+      return null;
+    }
+
+    function initHeaderKeys(){
+      displayKey = findHeaderKey(["full_name","name","full name","guest","guest_name"]) || searchCol.value || headers[0] || null;
+      subKey = findHeaderKey(["email","phone","ticket_id","id"]);
+      checkedKey = findHeaderKey(["checked_in_at","checked_in","checkin_at","check_in_at","checked in"]);
+    }
+
+    function initCheckedSet(){
+      checkedSet.clear();
+      if(!checkedKey) return;
+      for(let i=0;i<rows.length;i++){
+        if(normalize(rows[i][checkedKey])) checkedSet.add(i);
+      }
+    }
+
+    function isCheckedRow(row, index){
+      if(checkedSet.has(index)) return true;
+      if(!checkedKey) return false;
+      return normalize(row[checkedKey]) !== "";
+    }
+
+    function clearSelection(){
+      selectedIndex = null;
+      rowAction.classList.add("hidden");
+      checkInBtn.disabled = true;
+      checkInBtn.textContent = "Check in";
+      rowTitle.textContent = "—";
+      rowSub.textContent = "—";
+      rowNote.textContent = "";
+    }
+
+    function setRowAction(row){
+      if(!row || selectedIndex === null){
+        clearSelection();
+        return;
+      }
+
+      rowAction.classList.remove("hidden");
+
+      const title = (displayKey && row[displayKey]) ? row[displayKey] : (searchCol.value && row[searchCol.value]) ? row[searchCol.value] : "Selected guest";
+      rowTitle.textContent = title || "Selected guest";
+
+      if(subKey && row[subKey]) rowSub.textContent = row[subKey];
+      else if(searchCol.value && row[searchCol.value] && searchCol.value !== displayKey) rowSub.textContent = row[searchCol.value];
+      else rowSub.textContent = displayKey && row[displayKey] ? displayKey : "Guest";
+
+      const checked = isCheckedRow(row, selectedIndex);
+      checkInBtn.disabled = checked;
+      checkInBtn.textContent = checked ? "Checked in" : "Check in";
+
+      if(checked){
+        if(checkedKey && row[checkedKey]) rowNote.textContent = `Checked in at: ${row[checkedKey]}`;
+        else rowNote.textContent = "Checked in (local only).";
+      } else {
+        rowNote.textContent = checkedKey ? "Not checked in yet." : "No checked_in column; check-in is local only.";
+      }
     }
 
     function highlightCell(text, query){
@@ -448,13 +560,20 @@
         resultsEl.innerHTML = `<div class="muted">No matches found.</div>`;
         resultsMeta.textContent = "—";
         kpiMatches.textContent = "0";
+        clearSelection();
         return;
       }
 
       const headHtml = headers.map(h => `<th>${escapeHtml(h)}</th>`).join("");
       const key = searchCol.value;
 
-      const bodyHtml = matches.map(obj => {
+      const selectedVisible = matches.some(m => m.index === selectedIndex);
+      if(!selectedVisible) clearSelection();
+
+      const bodyHtml = matches.map(m => {
+        const obj = m.row;
+        const isSelected = m.index === selectedIndex;
+        const isChecked = isCheckedRow(obj, m.index);
 const nowrapCols = new Set(["id","email","phone","ticket_id","created_at","approved_at","checked_in_at","email_sent_at"]);
 
 const tds = headers.map(h => {
@@ -465,7 +584,9 @@ const tds = headers.map(h => {
   return `<td class="${cls}">${cell}</td>`;
 }).join("");
 
-        return `<tr>${tds}</tr>`;
+        const classes = [isSelected ? "selected" : "", isChecked ? "checked" : ""].filter(Boolean).join(" ");
+        const clsAttr = classes ? ` class="${classes}"` : "";
+        return `<tr data-idx="${m.index}"${clsAttr}>${tds}</tr>`;
       }).join("");
 
       resultsEl.innerHTML = `
@@ -491,6 +612,7 @@ const tds = headers.map(h => {
         resultsEl.innerHTML = `<div class="muted">Start typing to search.</div>`;
         resultsMeta.textContent = "—";
         kpiMatches.textContent = "—";
+        clearSelection();
         return;
       }
 
@@ -506,7 +628,7 @@ const tds = headers.map(h => {
         else ok = v === q;
 
         if(ok){
-          matches.push(rows[i]);
+          matches.push({ row: rows[i], index: i });
           if(matches.length >= limit) break;
         }
       }
@@ -522,11 +644,35 @@ const tds = headers.map(h => {
     matchMode.addEventListener("change", searchNow);
     maxResults.addEventListener("change", searchNow);
 
+    resultsEl.addEventListener("click", (e)=>{
+      const tr = e.target.closest("tbody tr[data-idx]");
+      if(!tr) return;
+      const idx = Number(tr.dataset.idx);
+      if(Number.isNaN(idx) || !rows[idx]) return;
+
+      selectedIndex = idx;
+      resultsEl.querySelectorAll("tbody tr.selected").forEach(r => r.classList.remove("selected"));
+      tr.classList.add("selected");
+      setRowAction(rows[idx]);
+    });
+
+    checkInBtn.addEventListener("click", ()=>{
+      if(selectedIndex === null || !rows[selectedIndex]) return;
+      const now = new Date().toISOString();
+      checkedSet.add(selectedIndex);
+      if(checkedKey) rows[selectedIndex][checkedKey] = now;
+      searchNow();
+      setRowAction(rows[selectedIndex]);
+    });
+
+    clearSelBtn.addEventListener("click", clearSelection);
+
     clearBtn.addEventListener("click", ()=>{
       qInput.value="";
       resultsEl.innerHTML = `<div class="muted">Start typing to search.</div>`;
       resultsMeta.textContent = "—";
       kpiMatches.textContent = "—";
+      clearSelection();
       qInput.focus();
     });
 
@@ -544,6 +690,7 @@ const tds = headers.map(h => {
       kpiRows.textContent = "—";
       kpiCol.textContent = "—";
       kpiMatches.textContent = "—";
+      clearSelection();
       pinInput.value = "";
       pinInput.focus();
     });
@@ -582,6 +729,8 @@ const tds = headers.map(h => {
 
         setColumns(headers);
         rebuildNormCache();
+        initHeaderKeys();
+        initCheckedSet();
 
         setDataUI("ok", `Loaded ${rows.length} row(s).`);
         kpiRows.textContent = String(rows.length);
@@ -594,6 +743,7 @@ const tds = headers.map(h => {
       }catch(err){
         setDataUI("bad", err.message);
         resultsEl.innerHTML = `<div class="muted">Could not load data.</div>`;
+        clearSelection();
       }
     }
 

@@ -38,21 +38,25 @@ export default async function handler(req, res) {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return res.status(500).json({ error: "Missing Supabase env vars" });
 
-  const { id, checkedInAt } = req.body || {};
+  const { id, name, checkedInAt } = req.body || {};
   const safeId = String(id || "").trim();
   if (!safeId) return res.status(400).json({ error: "Missing id" });
 
   const ts = String(checkedInAt || new Date().toISOString());
   const eventKey = process.env.EVENT_KEY || "default";
+  const safeName = String(name || "").trim().slice(0, 200);
 
   const supabase = createClient(url, key, { auth: { persistSession: false } });
   const { error } = await supabase
     .from("checkins")
-    .upsert({ event_key: eventKey, id: safeId, checked_in_at: ts }, { onConflict: "event_key,id" });
+    .upsert(
+      { event_key: eventKey, id: safeId, name: safeName || null, checked_in_at: ts },
+      { onConflict: "event_key,id" }
+    );
 
   if (error) return res.status(500).json({ error: error.message });
 
   res.setHeader("Content-Type", "application/json");
   res.setHeader("Cache-Control", "no-store");
-  return res.status(200).json({ ok: true, id: safeId, checkedInAt: ts });
+  return res.status(200).json({ ok: true, id: safeId, name: safeName || null, checkedInAt: ts });
 }

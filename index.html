@@ -497,7 +497,7 @@
     }
 
     function initHeaderKeys(){
-      displayKey = findHeaderKey(["full_name","name","full name","guest","guest_name"]) || searchCol.value || headers[0] || null;
+      displayKey = findHeaderKey(["first names","first_name","first name","full_name","name","full name","guest","guest_name"]) || searchCol.value || headers[0] || null;
       subKey = findHeaderKey(["email","phone","ticket_id","id"]);
       checkedKey = findHeaderKey(["checked_in_at","checked_in","checkin_at","check_in_at","checked in"]);
       idKey = findHeaderKey(["ticket_id","id","email","phone"]);
@@ -729,7 +729,11 @@ const tds = headers.map(h => {
           const res = await fetch("/api/checkin", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id, checkedInAt: now })
+            body: JSON.stringify({
+              id,
+              name: (displayKey && row[displayKey]) ? row[displayKey] : "",
+              checkedInAt: now
+            })
           });
           if(!res.ok) throw new Error("Check-in failed");
           serverChecks.set(id, now);

@@ -285,6 +285,14 @@
                 <option>200</option>
               </select>
             </div>
+            <div style="min-width: 180px;">
+              <label>Check-in view</label>
+              <select id="checkFilter" disabled>
+                <option value="all" selected>All guests</option>
+                <option value="checked">Checked in</option>
+                <option value="unchecked">Not checked in</option>
+              </select>
+            </div>
             <button class="btn secondary" id="clearBtn" disabled>Clear</button>
             <button class="btn secondary" id="reloadBtn" disabled>Reload</button>
             <button class="btn danger" id="logoutBtn" disabled>Logout</button>
@@ -365,6 +373,7 @@
     const searchCol = document.getElementById("searchCol");
     const matchMode = document.getElementById("matchMode");
     const maxResults = document.getElementById("maxResults");
+    const checkFilter = document.getElementById("checkFilter");
     const clearBtn = document.getElementById("clearBtn");
     const reloadBtn = document.getElementById("reloadBtn");
     const logoutBtn = document.getElementById("logoutBtn");
@@ -448,6 +457,7 @@
       searchCol.disabled = !on;
       matchMode.disabled = !on;
       maxResults.disabled = !on;
+      checkFilter.disabled = !on;
       clearBtn.disabled = !on;
       reloadBtn.disabled = !on;
       logoutBtn.disabled = !on;
@@ -502,6 +512,13 @@
       if(checkedSet.has(index)) return true;
       if(!checkedKey) return false;
       return normalize(row[checkedKey]) !== "";
+    }
+
+    function passesCheckFilter(row, index){
+      const f = checkFilter.value;
+      if(f === "checked") return isCheckedRow(row, index);
+      if(f === "unchecked") return !isCheckedRow(row, index);
+      return true;
     }
 
     function clearSelection(){
@@ -627,7 +644,7 @@ const tds = headers.map(h => {
         else if(mode==="starts") ok = v.startsWith(q);
         else ok = v === q;
 
-        if(ok){
+        if(ok && passesCheckFilter(rows[i], i)){
           matches.push({ row: rows[i], index: i });
           if(matches.length >= limit) break;
         }
@@ -643,6 +660,7 @@ const tds = headers.map(h => {
     searchCol.addEventListener("change", ()=>{ rebuildNormCache(); searchNow(); });
     matchMode.addEventListener("change", searchNow);
     maxResults.addEventListener("change", searchNow);
+    checkFilter.addEventListener("change", searchNow);
 
     resultsEl.addEventListener("click", (e)=>{
       const tr = e.target.closest("tbody tr[data-idx]");

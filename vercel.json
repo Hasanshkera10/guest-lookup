@@ -7,8 +7,7 @@
       ]
     }
   ],
-  "routes": [
-    { "src": "^/data/.*", "status": 404 },
-    { "handle": "filesystem" }
+  "rewrites": [
+    { "source": "/data/:path*", "destination": "/404" }
   ]
 }

@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { kv } from "@vercel/kv";
+import { createClient } from "@supabase/supabase-js";
 
 function base64urlToBuffer(s) {
   s = s.replace(/-/g, "+").replace(/_/g, "/");
@@ -34,8 +34,23 @@ export default async function handler(req, res) {
 
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
-  const key = process.env.EVENT_KEY || "gl:checkins";
-  const checkins = await kv.hgetall(key);
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return res.status(500).json({ error: "Missing Supabase env vars" });
+
+  const supabase = createClient(url, key, { auth: { persistSession: false } });
+  const eventKey = process.env.EVENT_KEY || "default";
+  const { data, error } = await supabase
+    .from("checkins")
+    .select("id, checked_in_at")
+    .eq("event_key", eventKey);
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  const checkins = {};
+  for (const row of data || []) {
+    if (row.id) checkins[row.id] = row.checked_in_at;
+  }
 
   res.setHeader("Content-Type", "application/json");
   res.setHeader("Cache-Control", "no-store");

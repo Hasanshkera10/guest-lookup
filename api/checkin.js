@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { kv } from "@vercel/kv";
+import { createClient } from "@supabase/supabase-js";
 
 function base64urlToBuffer(s) {
   s = s.replace(/-/g, "+").replace(/_/g, "/");
@@ -34,14 +34,23 @@ export default async function handler(req, res) {
 
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return res.status(500).json({ error: "Missing Supabase env vars" });
+
   const { id, checkedInAt } = req.body || {};
   const safeId = String(id || "").trim();
   if (!safeId) return res.status(400).json({ error: "Missing id" });
 
   const ts = String(checkedInAt || new Date().toISOString());
-  const key = process.env.EVENT_KEY || "gl:checkins";
+  const eventKey = process.env.EVENT_KEY || "default";
 
-  await kv.hset(key, { [safeId]: ts });
+  const supabase = createClient(url, key, { auth: { persistSession: false } });
+  const { error } = await supabase
+    .from("checkins")
+    .upsert({ event_key: eventKey, id: safeId, checked_in_at: ts }, { onConflict: "event_key,id" });
+
+  if (error) return res.status(500).json({ error: error.message });
 
   res.setHeader("Content-Type", "application/json");
   res.setHeader("Cache-Control", "no-store");

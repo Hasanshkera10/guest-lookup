@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Guest Lookup</title>
+  <style>
+    :root{
+      --bg0:#070A12;
+      --bg1:#0B1020;
+      --card:#0E1630cc;
+      --stroke:#ffffff1a;
+      --text:#EAF0FF;
+      --muted:#AAB6D8;
+      --accent:#8B5CF6;
+      --accent2:#22D3EE;
+      --danger:#FB7185;
+      --ok:#34D399;
+      --shadow: 0 18px 40px rgba(0,0,0,.45);
+      --radius:18px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      color:var(--text);
+      background:
+        radial-gradient(1200px 600px at 15% 20%, rgba(139,92,246,.35), transparent 60%),
+        radial-gradient(900px 500px at 85% 20%, rgba(34,211,238,.25), transparent 60%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+      min-height:100vh;
+    }
+    .wrap{ max-width:1100px; margin:0 auto; padding:28px 18px 44px; }
+    .top{
+      display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap;
+      margin-bottom:18px;
+    }
+    h1{ margin:0; font-size:44px; letter-spacing:-.02em; }
+    .sub{ color:var(--muted); margin:6px 0 0; }
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:10px 12px; border:1px solid var(--stroke); border-radius:999px;
+      background:rgba(255,255,255,.04);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+      color:var(--muted);
+      font-size:13px;
+    }
+    .pill b{ color:var(--text); font-family:var(--mono); font-weight:600; }
+    .grid{
+      display:grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap:16px;
+    }
+    @media (max-width: 920px){ .grid{ grid-template-columns:1fr; } }
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--stroke);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+      position:relative;
+      backdrop-filter: blur(10px);
+    }
+    .card .hd{
+      padding:14px 16px;
+      border-bottom:1px solid var(--stroke);
+      display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
+    }
+    .card .hd .title{ font-weight:700; letter-spacing:.01em; }
+    .card .bd{ padding:16px; }
+
+    .controls{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+    label{ display:block; color:var(--muted); font-size:12px; margin-bottom:6px; }
+    select, input[type="text"], input[type="password"]{
+      width:100%;
+      padding:12px 12px;
+      border-radius:12px;
+      border:1px solid var(--stroke);
+      background:rgba(0,0,0,.25);
+      color:var(--text);
+      outline:none;
+    }
+    select{ padding:11px 12px; }
+    input::placeholder{ color:#91A0CC; }
+
+    .btn{
+      border:1px solid var(--stroke);
+      background:linear-gradient(135deg, rgba(139,92,246,.35), rgba(34,211,238,.20));
+      color:var(--text);
+      padding:11px 14px;
+      border-radius:12px;
+      cursor:pointer;
+      font-weight:700;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+      transition: transform .08s ease, filter .08s ease;
+      white-space:nowrap;
+    }
+    .btn:hover{ filter:brightness(1.07); }
+    .btn:active{ transform: translateY(1px); }
+    .btn.secondary{
+      background:rgba(255,255,255,.05);
+    }
+    .btn.danger{
+      background:rgba(251,113,133,.12);
+      border-color:rgba(251,113,133,.30);
+      color:#FFD7DE;
+    }
+    .btn:disabled, select:disabled, input:disabled{ opacity:.55; cursor:not-allowed; }
+
+    .status{
+      color:var(--muted);
+      font-size:13px;
+      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    }
+    .dot{ width:10px; height:10px; border-radius:999px; background:var(--muted); }
+    .dot.ok{ background:var(--ok); }
+    .dot.bad{ background:var(--danger); }
+
+    .resultsWrap{
+      border:1px solid var(--stroke);
+      border-radius:14px;
+      overflow:auto;
+      max-height: 560px;
+      background:rgba(0,0,0,.18);
+    }
+    table{
+      width:100%;
+      border-collapse: collapse;
+      min-width: 820px;
+    }
+    thead th{
+      position:sticky; top:0;
+      background: rgba(8,12,24,.92);
+      backdrop-filter: blur(10px);
+      border-bottom:1px solid var(--stroke);
+      text-align:left;
+      padding:12px 12px;
+      font-size:12px;
+      color: #CFE0FF;
+      letter-spacing:.04em;
+      text-transform: uppercase;
+    }
+    tbody td{
+      border-bottom:1px solid rgba(255,255,255,.06);
+      padding:11px 12px;
+      color: #EAF0FF;
+      font-size:14px;
+      vertical-align:top;
+      word-break: break-word;
+    }
+    tbody tr:hover{ background: rgba(255,255,255,.04); }
+    .muted{ color:var(--muted); font-size:13px; }
+    .kpi{
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap:12px;
+    }
+    .kpi .box{
+      padding:12px;
+      border:1px solid var(--stroke);
+      border-radius:14px;
+      background:rgba(255,255,255,.04);
+    }
+    .kpi .n{
+      font-size:20px; font-weight:800;
+      letter-spacing:-.01em;
+    }
+    .kpi .l{
+      color:var(--muted); font-size:12px; margin-top:4px;
+    }
+
+    mark{
+      background: rgba(34,211,238,.25);
+      color: var(--text);
+      padding: 0 3px;
+      border-radius: 6px;
+    }
+
+    /* PIN Modal */
+    .overlay{
+      position:fixed; inset:0;
+      background: rgba(0,0,0,.62);
+      display:flex; align-items:center; justify-content:center;
+      padding: 20px;
+      z-index: 100;
+    }
+    .modal{
+      width: min(520px, 100%);
+      border-radius: 22px;
+      border:1px solid var(--stroke);
+      background:
+        radial-gradient(700px 320px at 20% 0%, rgba(139,92,246,.35), transparent 60%),
+        radial-gradient(700px 320px at 100% 0%, rgba(34,211,238,.22), transparent 60%),
+        rgba(10,14,30,.92);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      backdrop-filter: blur(12px);
+    }
+    .modal .mhd{ padding:16px 18px; border-bottom:1px solid var(--stroke); }
+    .modal .mhd .t{ font-size:16px; font-weight:800; }
+    .modal .mbd{ padding:18px; }
+    .row{ display:grid; grid-template-columns: 1fr auto; gap:10px; align-items:end; }
+    @media (max-width: 520px){ .row{ grid-template-columns:1fr; } }
+    .err{ color: #FFD7DE; font-size:13px; margin-top:10px; display:none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <h1>Guest Lookup</h1>
+        <div class="sub">Secure PIN access • Fast search • Shows matching rows</div>
+      </div>
+      <div class="pill">
+        Status: <span class="dot" id="authDot"></span>
+        <span id="authText">Checking session…</span>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="hd">
+          <div class="title">Search</div>
+          <div class="status" id="status">
+            <span class="dot" id="dataDot"></span>
+            <span id="statusText">Loading…</span>
+          </div>
+        </div>
+        <div class="bd">
+          <div class="controls">
+            <div style="flex:1; min-width: 220px;">
+              <label>Search text</label>
+              <input id="q" type="text" placeholder="Type a name, email, phone…" disabled />
+            </div>
+            <div style="min-width: 180px;">
+              <label>Search column</label>
+              <select id="searchCol" disabled></select>
+            </div>
+            <div style="min-width: 160px;">
+              <label>Match type</label>
+              <select id="matchMode" disabled>
+                <option value="contains">Contains</option>
+                <option value="starts">Starts with</option>
+                <option value="exact">Exact</option>
+              </select>
+            </div>
+            <div style="min-width: 130px;">
+              <label>Max results</label>
+              <select id="maxResults" disabled>
+                <option>25</option>
+                <option selected>50</option>
+                <option>100</option>
+                <option>200</option>
+              </select>
+            </div>
+            <button class="btn secondary" id="clearBtn" disabled>Clear</button>
+            <button class="btn secondary" id="reloadBtn" disabled>Reload</button>
+            <button class="btn danger" id="logoutBtn" disabled>Logout</button>
+          </div>
+
+          <div style="margin-top:14px;" class="kpi">
+            <div class="box">
+              <div class="n" id="kpiRows">—</div>
+              <div class="l">Rows loaded</div>
+            </div>
+            <div class="box">
+              <div class="n" id="kpiCol">—</div>
+              <div class="l">Current column</div>
+            </div>
+            <div class="box">
+              <div class="n" id="kpiMatches">—</div>
+              <div class="l">Matches shown</div>
+            </div>
+          </div>
+
+          <div id="hint" class="muted" style="margin-top:12px;">
+            Tip: choose the column (e.g. <span style="font-family:var(--mono)">full_name</span>) and start typing.
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="hd">
+          <div class="title">Results</div>
+          <div class="muted" id="resultsMeta">—</div>
+        </div>
+        <div class="bd">
+          <div id="results" class="muted">No results yet.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PIN Overlay -->
+  <div class="overlay" id="overlay" style="display:none;">
+    <div class="modal">
+      <div class="mhd">
+        <div class="t">Enter PIN</div>
+        <div class="muted" style="margin-top:6px;">This page is protected. Ask the organizer for the PIN.</div>
+      </div>
+      <div class="mbd">
+        <div class="row">
+          <div>
+            <label>PIN</label>
+            <input id="pin" type="password" placeholder="••••" autocomplete="one-time-code" />
+          </div>
+          <button class="btn" id="pinBtn">Unlock</button>
+        </div>
+        <div class="err" id="pinErr">Invalid PIN. Try again.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const authDot = document.getElementById("authDot");
+    const authText = document.getElementById("authText");
+
+    const dataDot = document.getElementById("dataDot");
+    const statusText = document.getElementById("statusText");
+
+    const qInput = document.getElementById("q");
+    const searchCol = document.getElementById("searchCol");
+    const matchMode = document.getElementById("matchMode");
+    const maxResults = document.getElementById("maxResults");
+    const clearBtn = document.getElementById("clearBtn");
+    const reloadBtn = document.getElementById("reloadBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+
+    const resultsEl = document.getElementById("results");
+    const resultsMeta = document.getElementById("resultsMeta");
+
+    const kpiRows = document.getElementById("kpiRows");
+    const kpiCol = document.getElementById("kpiCol");
+    const kpiMatches = document.getElementById("kpiMatches");
+
+    const overlay = document.getElementById("overlay");
+    const pinInput = document.getElementById("pin");
+    const pinBtn = document.getElementById("pinBtn");
+    const pinErr = document.getElementById("pinErr");
+
+    let headers = [];
+    let rows = [];
+    let normCache = [];
+
+    function normalize(s){
+      return (s ?? "").toString().trim().toLowerCase().replace(/\s+/g, " ");
+    }
+    function escapeHtml(str){
+      return (str ?? "").toString()
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+    }
+
+    // CSV parser (quotes supported)
+    function parseCSV(text){
+      const out=[]; let row=[], field="", inQuotes=false;
+      for(let i=0;i<text.length;i++){
+        const c=text[i], n=text[i+1];
+        if(c === '"' && inQuotes && n === '"'){ field+='"'; i++; }
+        else if(c === '"'){ inQuotes=!inQuotes; }
+        else if(c === ',' && !inQuotes){ row.push(field); field=""; }
+        else if((c === '\n' || c === '\r') && !inQuotes){
+          if(c === '\r' && n === '\n') i++;
+          row.push(field); field="";
+          if(row.some(cell => cell.trim() !== "")) out.push(row);
+          row=[];
+        } else field += c;
+      }
+      row.push(field);
+      if(row.some(cell => cell.trim() !== "")) out.push(row);
+      return out;
+    }
+    function gridToObjects(grid){
+      if(!grid.length) return {headers:[], rows:[]};
+      const hdr = grid[0].map((h,i)=>(h??"").toString().trim() || `col_${i+1}`);
+      const dataRows = grid.slice(1).map(r=>{
+        const obj={};
+        hdr.forEach((h,idx)=> obj[h] = (r[idx] ?? "").toString());
+        return obj;
+      });
+      return { headers: hdr, rows: dataRows };
+    }
+
+    function setAuthUI(ok){
+      authDot.className = "dot " + (ok ? "ok" : "bad");
+      authText.textContent = ok ? "Unlocked" : "Locked";
+    }
+    function setDataUI(state, text){
+      dataDot.className = "dot " + (state === "ok" ? "ok" : state === "bad" ? "bad" : "");
+      statusText.textContent = text;
+    }
+    function setEnabled(on){
+      qInput.disabled = !on;
+      searchCol.disabled = !on;
+      matchMode.disabled = !on;
+      maxResults.disabled = !on;
+      clearBtn.disabled = !on;
+      reloadBtn.disabled = !on;
+      logoutBtn.disabled = !on;
+    }
+
+    function preferSearchColumn(hdrs){
+      const prefs = ["full_name","name","full name","guest","guest_name","email","phone"];
+      const norm = hdrs.map(h => normalize(h));
+      for(const p of prefs){
+        const idx = norm.findIndex(h => h === normalize(p));
+        if(idx !== -1) return idx;
+      }
+      return 0;
+    }
+
+    function setColumns(hdrs){
+      searchCol.innerHTML = hdrs.map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join("");
+      searchCol.selectedIndex = preferSearchColumn(hdrs);
+    }
+
+    function rebuildNormCache(){
+      const key = searchCol.value;
+      normCache = rows.map(r => normalize(r[key]));
+      kpiCol.textContent = key ? key : "—";
+    }
+
+    function highlightCell(text, query){
+      const t = (text ?? "").toString();
+      if(!query) return escapeHtml(t);
+
+      // case-insensitive highlight (simple)
+      const idx = t.toLowerCase().indexOf(query.toLowerCase());
+      if(idx === -1) return escapeHtml(t);
+
+      const before = escapeHtml(t.slice(0, idx));
+      const mid = escapeHtml(t.slice(idx, idx + query.length));
+      const after = escapeHtml(t.slice(idx + query.length));
+      return `${before}<mark>${mid}</mark>${after}`;
+    }
+
+    function renderTable(matches, query){
+      if(!matches.length){
+        resultsEl.innerHTML = `<div class="muted">No matches found.</div>`;
+        resultsMeta.textContent = "—";
+        kpiMatches.textContent = "0";
+        return;
+      }
+
+      const headHtml = headers.map(h => `<th>${escapeHtml(h)}</th>`).join("");
+      const key = searchCol.value;
+
+      const bodyHtml = matches.map(obj => {
+        const tds = headers.map(h => {
+          const v = obj[h];
+          const cell = (h === key) ? highlightCell(v, query) : escapeHtml(v);
+          return `<td>${cell}</td>`;
+        }).join("");
+        return `<tr>${tds}</tr>`;
+      }).join("");
+
+      resultsEl.innerHTML = `
+        <div class="resultsWrap">
+          <table>
+            <thead><tr>${headHtml}</tr></thead>
+            <tbody>${bodyHtml}</tbody>
+          </table>
+        </div>
+      `;
+
+      resultsMeta.textContent = `${matches.length} result(s)`;
+      kpiMatches.textContent = String(matches.length);
+    }
+
+    function searchNow(){
+      const q = normalize(qInput.value);
+      if(!rows.length){
+        resultsEl.innerHTML = `<div class="muted">No data loaded.</div>`;
+        return;
+      }
+      if(!q){
+        resultsEl.innerHTML = `<div class="muted">Start typing to search.</div>`;
+        resultsMeta.textContent = "—";
+        kpiMatches.textContent = "—";
+        return;
+      }
+
+      const mode = matchMode.value;
+      const limit = parseInt(maxResults.value, 10);
+
+      const matches=[];
+      for(let i=0;i<rows.length;i++){
+        const v = normCache[i];
+        let ok=false;
+        if(mode==="contains") ok = v.includes(q);
+        else if(mode==="starts") ok = v.startsWith(q);
+        else ok = v === q;
+
+        if(ok){
+          matches.push(rows[i]);
+          if(matches.length >= limit) break;
+        }
+      }
+      renderTable(matches, qInput.value.trim());
+    }
+
+    let t=null;
+    qInput.addEventListener("input", ()=>{
+      clearTimeout(t);
+      t=setTimeout(searchNow, 70);
+    });
+    searchCol.addEventListener("change", ()=>{ rebuildNormCache(); searchNow(); });
+    matchMode.addEventListener("change", searchNow);
+    maxResults.addEventListener("change", searchNow);
+
+    clearBtn.addEventListener("click", ()=>{
+      qInput.value="";
+      resultsEl.innerHTML = `<div class="muted">Start typing to search.</div>`;
+      resultsMeta.textContent = "—";
+      kpiMatches.textContent = "—";
+      qInput.focus();
+    });
+
+    reloadBtn.addEventListener("click", async ()=>{
+      await loadGuests({ bustCache: true });
+    });
+
+    logoutBtn.addEventListener("click", async ()=>{
+      await fetch("/api/logout", { method: "POST" }).catch(()=>{});
+      setEnabled(false);
+      setAuthUI(false);
+      overlay.style.display = "flex";
+      setDataUI("idle", "Locked. Enter PIN to load.");
+      resultsEl.innerHTML = `<div class="muted">Locked.</div>`;
+      kpiRows.textContent = "—";
+      kpiCol.textContent = "—";
+      kpiMatches.textContent = "—";
+      pinInput.value = "";
+      pinInput.focus();
+    });
+
+    async function checkAuth(){
+      const r = await fetch("/api/me", { cache: "no-store" });
+      const j = await r.json();
+      return !!j.ok;
+    }
+
+    async function loadGuests({ bustCache } = { bustCache:false }){
+      setEnabled(false);
+      setDataUI("idle", "Loading guest list…");
+      resultsEl.innerHTML = `<div class="muted">Loading…</div>`;
+      resultsMeta.textContent = "—";
+      kpiMatches.textContent = "—";
+
+      try{
+        const url = bustCache ? `/api/guests?v=${Date.now()}` : "/api/guests";
+        const res = await fetch(url, { cache: "no-store" });
+        if(!res.ok){
+          if(res.status === 401) throw new Error("Unauthorized (PIN required).");
+          throw new Error(`Failed to load guests (HTTP ${res.status})`);
+        }
+
+        const text = await res.text();
+        const grid = parseCSV(text);
+        const obj = gridToObjects(grid);
+
+        headers = obj.headers;
+        rows = obj.rows;
+
+        if(!headers.length || !rows.length){
+          throw new Error("Guest CSV is empty (needs headers + at least 1 row).");
+        }
+
+        setColumns(headers);
+        rebuildNormCache();
+
+        setDataUI("ok", `Loaded ${rows.length} row(s).`);
+        kpiRows.textContent = String(rows.length);
+        kpiCol.textContent = searchCol.value;
+        kpiMatches.textContent = "—";
+
+        setEnabled(true);
+        resultsEl.innerHTML = `<div class="muted">Start typing to search.</div>`;
+        qInput.focus();
+      }catch(err){
+        setDataUI("bad", err.message);
+        resultsEl.innerHTML = `<div class="muted">Could not load data.</div>`;
+      }
+    }
+
+    async function unlock(pin){
+      pinErr.style.display = "none";
+      pinBtn.disabled = true;
+      pinBtn.textContent = "Unlocking…";
+      try{
+        const res = await fetch("/api/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pin })
+        });
+
+        if(!res.ok) throw new Error("Invalid PIN");
+
+        overlay.style.display = "none";
+        setAuthUI(true);
+        await loadGuests();
+      }catch(e){
+        pinErr.style.display = "block";
+        setAuthUI(false);
+      }finally{
+        pinBtn.disabled = false;
+        pinBtn.textContent = "Unlock";
+        pinInput.select();
+      }
+    }
+
+    pinBtn.addEventListener("click", ()=> unlock(pinInput.value));
+    pinInput.addEventListener("keydown", (e)=>{
+      if(e.key === "Enter") unlock(pinInput.value);
+    });
+
+    // Boot
+    (async function init(){
+      try{
+        const ok = await checkAuth();
+        if(ok){
+          setAuthUI(true);
+          overlay.style.display = "none";
+          await loadGuests();
+        } else {
+          setAuthUI(false);
+          overlay.style.display = "flex";
+          setDataUI("idle", "Locked. Enter PIN to load.");
+          setEnabled(false);
+          resultsEl.innerHTML = `<div class="muted">Locked.</div>`;
+          pinInput.focus();
+        }
+      }catch(e){
+        setAuthUI(false);
+        overlay.style.display = "flex";
+        setDataUI("bad", "Auth check failed.");
+        pinInput.focus();
+      }
+    })();
+  </script>
+</body>
+</html>

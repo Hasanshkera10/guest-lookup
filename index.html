@@ -508,6 +508,18 @@
       }
     }
 
+    function updateCheckCounts(){
+      const total = rows.length;
+      let checked = 0;
+      for(let i=0;i<rows.length;i++){
+        if(isCheckedRow(rows[i], i)) checked++;
+      }
+      const unchecked = total - checked;
+      checkFilter.options[0].textContent = `All guests (${total})`;
+      checkFilter.options[1].textContent = `Checked in (${checked})`;
+      checkFilter.options[2].textContent = `Not checked in (${unchecked})`;
+    }
+
     function isCheckedRow(row, index){
       if(checkedSet.has(index)) return true;
       if(!checkedKey) return false;
@@ -573,9 +585,16 @@
     }
 
     function renderTable(matches, query){
+      const filterLabel = checkFilter.value === "checked"
+        ? "Checked in"
+        : checkFilter.value === "unchecked"
+          ? "Not checked in"
+          : "All guests";
+      const queryNote = query ? ` • search: "${query}"` : "";
+
       if(!matches.length){
         resultsEl.innerHTML = `<div class="muted">No matches found.</div>`;
-        resultsMeta.textContent = "—";
+        resultsMeta.textContent = `${filterLabel}: 0 result(s)${queryNote}`;
         kpiMatches.textContent = "0";
         clearSelection();
         return;
@@ -615,7 +634,7 @@ const tds = headers.map(h => {
         </div>
       `;
 
-      resultsMeta.textContent = `${matches.length} result(s)`;
+      resultsMeta.textContent = `${filterLabel}: ${matches.length} result(s)${queryNote}`;
       kpiMatches.textContent = String(matches.length);
     }
 
@@ -625,24 +644,19 @@ const tds = headers.map(h => {
         resultsEl.innerHTML = `<div class="muted">No data loaded.</div>`;
         return;
       }
-      if(!q){
-        resultsEl.innerHTML = `<div class="muted">Start typing to search.</div>`;
-        resultsMeta.textContent = "—";
-        kpiMatches.textContent = "—";
-        clearSelection();
-        return;
-      }
 
       const mode = matchMode.value;
       const limit = parseInt(maxResults.value, 10);
 
       const matches=[];
       for(let i=0;i<rows.length;i++){
-        const v = normCache[i];
-        let ok=false;
-        if(mode==="contains") ok = v.includes(q);
-        else if(mode==="starts") ok = v.startsWith(q);
-        else ok = v === q;
+        let ok = true;
+        if(q){
+          const v = normCache[i];
+          if(mode==="contains") ok = v.includes(q);
+          else if(mode==="starts") ok = v.startsWith(q);
+          else ok = v === q;
+        }
 
         if(ok && passesCheckFilter(rows[i], i)){
           matches.push({ row: rows[i], index: i });
@@ -681,16 +695,14 @@ const tds = headers.map(h => {
       if(checkedKey) rows[selectedIndex][checkedKey] = now;
       searchNow();
       setRowAction(rows[selectedIndex]);
+      updateCheckCounts();
     });
 
     clearSelBtn.addEventListener("click", clearSelection);
 
     clearBtn.addEventListener("click", ()=>{
       qInput.value="";
-      resultsEl.innerHTML = `<div class="muted">Start typing to search.</div>`;
-      resultsMeta.textContent = "—";
-      kpiMatches.textContent = "—";
-      clearSelection();
+      searchNow();
       qInput.focus();
     });
 
@@ -749,6 +761,7 @@ const tds = headers.map(h => {
         rebuildNormCache();
         initHeaderKeys();
         initCheckedSet();
+        updateCheckCounts();
 
         setDataUI("ok", `Loaded ${rows.length} row(s).`);
         kpiRows.textContent = String(rows.length);
@@ -756,7 +769,7 @@ const tds = headers.map(h => {
         kpiMatches.textContent = "—";
 
         setEnabled(true);
-        resultsEl.innerHTML = `<div class="muted">Start typing to search.</div>`;
+        searchNow();
         qInput.focus();
       }catch(err){
         setDataUI("bad", err.message);

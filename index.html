@@ -143,12 +143,19 @@
       text-transform: uppercase;
     }
     tbody td{
-      border-bottom:1px solid rgba(255,255,255,.06);
-      padding:11px 12px;
-      color: #EAF0FF;
-      font-size:14px;
-      vertical-align:top;
-      word-break: break-word;
+  border-bottom:1px solid rgba(255,255,255,.06);
+  padding:11px 12px;
+  color: #EAF0FF;
+  font-size:14px;
+  vertical-align:top;
+
+  /* ✅ Fix vertical text */
+  word-break: normal;          /* don't break inside words */
+  overflow-wrap: anywhere;     /* wrap at natural points if needed */
+  white-space: nowrap;         /* keep IDs/emails on one line */
+  max-width: 340px;            /* prevent mega-wide columns */
+  overflow: hidden;            /* hide overflow */
+  text-overflow: ellipsis;     /* show ... */
     }
     tbody tr:hover{ background: rgba(255,255,255,.04); }
     .muted{ color:var(--muted); font-size:13px; }
@@ -448,11 +455,16 @@
       const key = searchCol.value;
 
       const bodyHtml = matches.map(obj => {
-        const tds = headers.map(h => {
-          const v = obj[h];
-          const cell = (h === key) ? highlightCell(v, query) : escapeHtml(v);
-          return `<td>${cell}</td>`;
-        }).join("");
+const nowrapCols = new Set(["id","email","phone","ticket_id","created_at","approved_at","checked_in_at","email_sent_at"]);
+
+const tds = headers.map(h => {
+  const v = obj[h];
+  const cell = (h === key) ? highlightCell(v, query) : escapeHtml(v);
+
+  const cls = nowrapCols.has(h.toLowerCase()) ? "nowrap" : "";
+  return `<td class="${cls}">${cell}</td>`;
+}).join("");
+
         return `<tr>${tds}</tr>`;
       }).join("");
 

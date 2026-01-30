@@ -340,6 +340,7 @@
                 <option value="unchecked">Not checked in</option>
               </select>
             </div>
+            <button class="btn secondary" id="downloadBtn" disabled>Download report</button>
             <button class="btn secondary" id="clearBtn" disabled>Clear</button>
             <button class="btn secondary" id="reloadBtn" disabled>Reload</button>
             <button class="btn danger" id="logoutBtn" disabled>Logout</button>
@@ -428,6 +429,7 @@
     const matchMode = document.getElementById("matchMode");
     const maxResults = document.getElementById("maxResults");
     const checkFilter = document.getElementById("checkFilter");
+    const downloadBtn = document.getElementById("downloadBtn");
     const clearBtn = document.getElementById("clearBtn");
     const reloadBtn = document.getElementById("reloadBtn");
     const logoutBtn = document.getElementById("logoutBtn");
@@ -517,6 +519,7 @@
       matchMode.disabled = !on;
       maxResults.disabled = !on;
       checkFilter.disabled = !on;
+      downloadBtn.disabled = !on;
       clearBtn.disabled = !on;
       reloadBtn.disabled = !on;
       logoutBtn.disabled = !on;
@@ -810,6 +813,10 @@ const tds = headers.map(h => {
     matchMode.addEventListener("change", searchNow);
     maxResults.addEventListener("change", searchNow);
     checkFilter.addEventListener("change", searchNow);
+
+    downloadBtn.addEventListener("click", ()=>{
+      window.location.href = "/api/report";
+    });
 
     resultsEl.addEventListener("click", (e)=>{
       const tr = e.target.closest("tbody tr[data-idx]");

@@ -125,6 +125,53 @@
       max-height: 560px;
       background:rgba(0,0,0,.18);
     }
+    .report{
+      margin-top:14px;
+      padding:12px;
+      border:1px solid var(--stroke);
+      border-radius:14px;
+      background:rgba(0,0,0,.18);
+    }
+    .reportHd{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:8px;
+    }
+    .reportWrap{
+      border:1px solid var(--stroke);
+      border-radius:12px;
+      overflow:auto;
+      max-height: 360px;
+      background:rgba(0,0,0,.18);
+    }
+    .reportTable{
+      width:100%;
+      border-collapse: collapse;
+      min-width: 520px;
+    }
+    .reportTable thead th{
+      position:sticky; top:0;
+      background: rgba(8,12,24,.92);
+      backdrop-filter: blur(10px);
+      border-bottom:1px solid var(--stroke);
+      text-align:left;
+      padding:10px 12px;
+      font-size:11px;
+      color: #CFE0FF;
+      letter-spacing:.04em;
+      text-transform: uppercase;
+    }
+    .reportTable tbody td{
+      border-bottom:1px solid rgba(255,255,255,.06);
+      padding:9px 12px;
+      color: #EAF0FF;
+      font-size:13px;
+      vertical-align:top;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     table{
       width:100%;
       border-collapse: collapse;
@@ -337,6 +384,13 @@
               <button class="btn secondary" id="clearSelBtn">Close</button>
             </div>
           </div>
+          <div class="report">
+            <div class="reportHd">
+              <div class="title">Check-in report</div>
+              <div class="muted" id="reportMeta">Checked in: —</div>
+            </div>
+            <div id="reportBody" class="muted">No check-ins yet.</div>
+          </div>
         </div>
       </div>
     </div>
@@ -386,6 +440,8 @@
     const rowNote = document.getElementById("rowNote");
     const checkInBtn = document.getElementById("checkInBtn");
     const clearSelBtn = document.getElementById("clearSelBtn");
+    const reportMeta = document.getElementById("reportMeta");
+    const reportBody = document.getElementById("reportBody");
 
     const kpiRows = document.getElementById("kpiRows");
     const kpiCol = document.getElementById("kpiCol");
@@ -402,6 +458,7 @@
     let selectedIndex = null;
     const checkedSet = new Set();
     const serverChecks = new Map();
+    let rowById = new Map();
     let displayKey = null;
     let subKey = null;
     let checkedKey = null;
@@ -536,6 +593,19 @@
       return `row_${index}`;
     }
 
+    function getRowName(row){
+      if(displayKey && row[displayKey]) return String(row[displayKey]).trim();
+      return "";
+    }
+
+    function buildRowIndex(){
+      rowById = new Map();
+      for(let i=0;i<rows.length;i++){
+        const id = getRowId(rows[i], i);
+        if(id && !rowById.has(id)) rowById.set(id, rows[i]);
+      }
+    }
+
     async function loadCheckins(){
       serverChecks.clear();
       try{
@@ -543,8 +613,10 @@
         if(!res.ok) return;
         const data = await res.json();
         if(data && data.checkins){
-          for(const [id, ts] of Object.entries(data.checkins)){
-            if(id) serverChecks.set(id, ts);
+          for(const [id, obj] of Object.entries(data.checkins)){
+            if(!id) continue;
+            if(obj && typeof obj === "object") serverChecks.set(id, obj);
+            else serverChecks.set(id, { checkedInAt: obj, name: null });
           }
         }
       }catch(_){}
@@ -588,13 +660,49 @@
 
       if(checked){
         const id = getRowId(row, selectedIndex);
-        const ts = id ? serverChecks.get(id) : null;
+        const entry = id ? serverChecks.get(id) : null;
+        const ts = entry && entry.checkedInAt ? entry.checkedInAt : null;
         if(ts) rowNote.textContent = `Checked in at: ${ts}`;
         else if(checkedKey && row[checkedKey]) rowNote.textContent = `Checked in at: ${row[checkedKey]}`;
         else rowNote.textContent = "Checked in (local only).";
       } else {
         rowNote.textContent = checkedKey ? "Not checked in yet." : "Not checked in yet.";
       }
+    }
+
+    function renderReport(){
+      const entries = [];
+      for(const [id, entry] of serverChecks.entries()){
+        const row = rowById.get(id);
+        const name = entry && entry.name ? entry.name : (row ? getRowName(row) : "");
+        const ts = entry && entry.checkedInAt ? entry.checkedInAt : "";
+        entries.push({ id, name, ts });
+      }
+
+      entries.sort((a,b)=> (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0));
+
+      if(!entries.length){
+        reportMeta.textContent = "Checked in: 0";
+        reportBody.innerHTML = `<div class="muted">No check-ins yet.</div>`;
+        return;
+      }
+
+      const rowsHtml = entries.map(e => {
+        const n = escapeHtml(e.name || "—");
+        const id = escapeHtml(e.id || "—");
+        const ts = escapeHtml(e.ts || "—");
+        return `<tr><td>${n}</td><td class="nowrap">${id}</td><td class="nowrap">${ts}</td></tr>`;
+      }).join("");
+
+      reportMeta.textContent = `Checked in: ${entries.length}`;
+      reportBody.innerHTML = `
+        <div class="reportWrap">
+          <table class="reportTable">
+            <thead><tr><th>Name</th><th>ID</th><th>Checked in at</th></tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>
+      `;
     }
 
     function highlightCell(text, query){
@@ -721,6 +829,7 @@ const tds = headers.map(h => {
         const now = new Date().toISOString();
         const row = rows[selectedIndex];
         const id = getRowId(row, selectedIndex);
+        const name = getRowName(row);
 
         checkInBtn.disabled = true;
         checkInBtn.textContent = "Checking in…";
@@ -731,12 +840,12 @@ const tds = headers.map(h => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               id,
-              name: (displayKey && row[displayKey]) ? row[displayKey] : "",
+              name,
               checkedInAt: now
             })
           });
           if(!res.ok) throw new Error("Check-in failed");
-          serverChecks.set(id, now);
+          serverChecks.set(id, { checkedInAt: now, name: name || null });
           checkedSet.add(selectedIndex);
           if(checkedKey) rows[selectedIndex][checkedKey] = now;
         }catch(_){
@@ -748,6 +857,7 @@ const tds = headers.map(h => {
         searchNow();
         setRowAction(rows[selectedIndex]);
         updateCheckCounts();
+        renderReport();
       })();
     });
 
@@ -773,6 +883,8 @@ const tds = headers.map(h => {
       kpiRows.textContent = "—";
       kpiCol.textContent = "—";
       kpiMatches.textContent = "—";
+      reportMeta.textContent = "Checked in: —";
+      reportBody.innerHTML = `<div class="muted">Locked.</div>`;
       clearSelection();
       pinInput.value = "";
       pinInput.focus();
@@ -814,8 +926,10 @@ const tds = headers.map(h => {
         rebuildNormCache();
         initHeaderKeys();
         initCheckedSet();
+        buildRowIndex();
         await loadCheckins();
         updateCheckCounts();
+        renderReport();
 
         setDataUI("ok", `Loaded ${rows.length} row(s).`);
         kpiRows.textContent = String(rows.length);
@@ -828,6 +942,8 @@ const tds = headers.map(h => {
       }catch(err){
         setDataUI("bad", err.message);
         resultsEl.innerHTML = `<div class="muted">Could not load data.</div>`;
+        reportMeta.textContent = "Checked in: —";
+        reportBody.innerHTML = `<div class="muted">No report available.</div>`;
         clearSelection();
       }
     }

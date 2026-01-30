@@ -41,15 +41,15 @@ export default async function handler(req, res) {
   const supabase = createClient(url, key, { auth: { persistSession: false } });
   const eventKey = process.env.EVENT_KEY || "default";
   const { data, error } = await supabase
-    .from("checkins")
-    .select("id, checked_in_at")
+    .from("guests_pm")
+    .select("id, name, checked_in_at")
     .eq("event_key", eventKey);
 
   if (error) return res.status(500).json({ error: error.message });
 
   const checkins = {};
   for (const row of data || []) {
-    if (row.id) checkins[row.id] = row.checked_in_at;
+    if (row.id) checkins[row.id] = { checkedInAt: row.checked_in_at, name: row.name || null };
   }
 
   res.setHeader("Content-Type", "application/json");

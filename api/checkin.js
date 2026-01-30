@@ -48,7 +48,7 @@ export default async function handler(req, res) {
 
   const supabase = createClient(url, key, { auth: { persistSession: false } });
   const { error } = await supabase
-    .from("checkins")
+    .from("guests_pm")
     .upsert(
       { event_key: eventKey, id: safeId, name: safeName || null, checked_in_at: ts },
       { onConflict: "event_key,id" }
